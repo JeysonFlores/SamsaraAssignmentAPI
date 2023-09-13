@@ -4,7 +4,7 @@ import redis.asyncio as redis
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket
-
+from fastapi.middleware.cors import CORSMiddleware
 
 from api.services.event_input import EventInput
 from api.services.websocket_manager import WebSocketManager
@@ -14,6 +14,13 @@ from api.common.common_functions import get_value_from_redis, set_value_into_red
 load_dotenv()
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 socket_pool = WebSocketManager()
 event_input = EventInput(socket_pool.broadcast_from_input)
 redis_conn = redis.from_url(os.environ.get("REDIS_URL"))
