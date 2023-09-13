@@ -2,11 +2,15 @@ import os
 import json
 import asyncio
 import redis.asyncio as redis
+
+from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket
 
 from api.services.event_input import EventInput
 from api.services.websocket_manager import WebSocketManager
 
+
+load_dotenv()
 
 app = FastAPI()
 socket_pool = WebSocketManager()
