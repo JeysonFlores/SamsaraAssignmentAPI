@@ -1,13 +1,14 @@
 import os
-import json
 import asyncio
 import redis.asyncio as redis
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket
 
+
 from api.services.event_input import EventInput
 from api.services.websocket_manager import WebSocketManager
+from api.common.common_functions import get_value_from_redis, set_value_into_redis
 
 
 load_dotenv()
@@ -24,6 +25,40 @@ async def on_startup():
     loop.create_task(event_input.start(redis_conn))
 
 
+# Vehicle endpoints
+
+
+from pydantic import BaseModel
+
+
+class ActiveVehicle(BaseModel):
+    id: int
+
+
+@app.get("/active-vehicles")
+async def active_vehicles():
+    worker_input_list = await get_value_from_redis(
+        redis_conn, os.environ.get("WORKER_INPUT")
+    )
+    return worker_input_list.get("vehicles")
+
+
+@app.post("/active-vehicles")
+async def add_active_vehicle(vehicle: ActiveVehicle):
+    worker_input_list = await get_value_from_redis(
+        redis_conn, os.environ.get("WORKER_INPUT")
+    )
+    vehicle_list = worker_input_list.get("vehicles", [])
+    vehicle_list.append(vehicle.id)
+    worker_input_list["vehicles"] = vehicle_list
+
+    await set_value_into_redis(
+        redis_conn, os.environ.get("WORKER_INPUT"), worker_input_list
+    )
+
+    return {"msg": "succeed"}
+
+
 @app.websocket("/vehicle/{vehicle_id}/{sensor}/ws")
 async def websocket_endpoint(websocket: WebSocket, vehicle_id: int, sensor: str):
     topic = f"vehicle/{vehicle_id}/{sensor}"
@@ -35,12 +70,3 @@ async def websocket_endpoint(websocket: WebSocket, vehicle_id: int, sensor: str)
             await websocket.receive_text()
     except Exception:
         await socket_pool.remove_connection_from_channel(topic, websocket)
-
-
-@app.get("/debug/topics")
-async def vehicluwus():
-    topics = []
-    for key in socket_pool.active_connections.keys():
-        topics.append(key)
-
-    return json.dumps(topics)
